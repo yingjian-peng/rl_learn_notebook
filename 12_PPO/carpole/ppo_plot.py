@@ -9,12 +9,6 @@ import torch
 from ppo_train import PPO
 
 
-def take_greedy_action(agent, state):
-    state = torch.as_tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
-    with torch.no_grad():
-        probs = agent.actor(state)
-    return probs.argmax(dim=1).item()
-
 
 def main():
     env_name = "CartPole-v1"
@@ -53,7 +47,11 @@ def main():
     total_reward = 0
 
     while not done:
-        action = take_greedy_action(agent, state)
+        state = torch.as_tensor(state, dtype=torch.float32, device=agent.device).unsqueeze(0)
+        with torch.no_grad():
+            probs = agent.actor(state)
+            action = probs.argmax(dim=1).item()
+            
         next_state, reward, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
         state = next_state
