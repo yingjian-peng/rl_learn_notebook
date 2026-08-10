@@ -1,15 +1,15 @@
-import random
 import gymnasium as gym
 import numpy as np
-from tqdm import tqdm
 import torch
 from torch import nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
+
+import random
 
 from pathlib import Path
 import collections
 
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 
@@ -73,7 +73,7 @@ class TwoLayerFC(torch.nn.Module):
 
 #---------------------------------------------------------------------------------------
 # DDPG(Deep Deterministic Policy Gradient)
-# Actor(策略网络):根据状态输出确定性的动作。
+# Actor(策略网络):根据状态输出确定性的动作
 # Critic(Q 值网络):评估在给定状态下采取某个动作的价值
 # 目标网络(Target Networks):用于稳定训练,通过软更新缓慢跟踪在线网络
 # 状态维度, 隐藏层数, 动作维度, 动作最大值, 探索噪声标准差, 学习率, 软更新系数, 折扣因子, 设备
@@ -111,7 +111,7 @@ class DDPG:
     # 软更新(将目标网络的参数向在线网络缓慢靠拢)
     def soft_update(self, net, target_net):                                     # 在线网络, 目标网络
         for param_target, param in zip(target_net.parameters(), net.parameters()):
-            # θtarget <- τ * θonline ​+ (1−τ) * θtarget​
+            # θtarget <-- τ * θonline ​+ (1−τ) * θtarget​
             param_target.data.copy_(param_target.data * (1.0 - self.tau) + param.data * self.tau)
     
 
@@ -162,18 +162,19 @@ class DDPG:
 
 
 
-
-
+#---------------------------------------------------------------------------------------
+# 经验回放缓冲区(Replay Buffer)
+#---------------------------------------------------------------------------------------
 class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity) 
+    def __init__(self, capacity):                               # 类定义与初始化
+        self.buffer = collections.deque(maxlen=capacity)        # 创建双端队列,并设置最大长度
 
     def add(self, state, action, reward, next_state, done): 
         self.buffer.append((state, action, reward, next_state, done)) 
 
-    def sample(self, batch_size): 
-        transitions = random.sample(self.buffer, batch_size)
-        state, action, reward, next_state, done = zip(*transitions)
+    def sample(self, batch_size):                               # 从缓冲区随机采样x条经验
+        transitions = random.sample(self.buffer, batch_size)    # 从缓存区无放回随机选取x个元素
+        state, action, reward, next_state, done = zip(*transitions) # 解压
         return np.array(state), action, reward, np.array(next_state), done 
 
     def size(self): 
@@ -181,28 +182,32 @@ class ReplayBuffer:
 
 
 
+#---------------------------------------------------------------------------------------
+# 离线策略训练智能体
+# 智能体, 最大轮数, 缓存区, 开始训练前缓存区最小经验数量, 每次更新时从缓存区采样的批大小
+#---------------------------------------------------------------------------------------
 def train_off_policy_agent(env, agent, num_episodes, replay_buffer, minimal_size, batch_size):
-    return_list = []
-    for i in range(10):
+    return_list = []                                        # 每回合的总回报
+    for i in range(10):                                     # 外层循环
         with tqdm(total=int(num_episodes/10), desc='Iteration %d' % i) as pbar:
-            for i_episode in range(int(num_episodes/10)):
-                episode_return = 0
-                state, _ = env.reset()
+            for i_episode in range(int(num_episodes/10)):   # 内层循环
+                episode_return = 0                          # 累计本回合奖励
+                state, _ = env.reset()                      # 重置环境
                 done = False
                 while not done:
-                    action = agent.take_action(state)
+                    action = agent.take_action(state)       # actor根据当前状态选择动作a
 
-                    next_state, reward, terminated, truncated, _ = env.step(action)
+                    next_state, reward, terminated, truncated, _ = env.step(action) # 执行动作
                     done = terminated or truncated
                     
-                    replay_buffer.add(state, action, reward, next_state, done)
+                    replay_buffer.add(state, action, reward, next_state, done)  # 存入经验回放缓冲区
                     state = next_state
-                    episode_return += reward
-                    if replay_buffer.size() > minimal_size:
-                        b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(batch_size)
+                    episode_return += reward                # 累加奖励
+                    if replay_buffer.size() > minimal_size: # 当经验数量超过size时开始训练
+                        b_s, b_a, b_r, b_ns, b_d = replay_buffer.sample(batch_size) # 采样1个批次经验
                         transition_dict = {'states': b_s, 'actions': b_a, 'next_states': b_ns, 'rewards': b_r, 'dones': b_d}
-                        agent.update(transition_dict)
-                return_list.append(episode_return)
+                        agent.update(transition_dict)       # 采样结果更新网络
+                return_list.append(episode_return)          # 记录本回合回报
                 if (i_episode+1) % 10 == 0:
                     pbar.set_postfix({'episode': '%d' % (num_episodes/10 * i + i_episode+1), 'return': '%.3f' % np.mean(return_list[-10:])})
                 pbar.update(1)
@@ -230,11 +235,11 @@ def main():
     actor_lr = 0.0003
     critic_lr = 0.003
     tau = 0.005                                     # 软更新参数
-    gamma = 0.98
+    gamma = 0.98                                    # 折扣因子
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     agent = DDPG(state_dim, hidden_dim, action_dim, action_bound, sigma, actor_lr, critic_lr, tau, gamma, device)
 
-    num_episodes = 200
+    num_episodes = 500
     replay_buffer = ReplayBuffer(10000)
     minimal_size = 1000
     batch_size = 64
