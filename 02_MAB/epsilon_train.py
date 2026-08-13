@@ -76,6 +76,7 @@ def main():
     # print('epsilon-贪婪算法的累积懊悔为:', epsilin_greedy_solver.regret)
     # plot_results([epsilin_greedy_solver], ['EpsilonGreedy'])
 
+
     # # (2)不用采样概率
     # epsilons = [1e-4, 0.01, 0.25, 0.5]
     # bandit_10_arm = BernoulliBandit(10)
@@ -85,6 +86,7 @@ def main():
     #     solver.run(500)
     
     # plot_results(epsilons_greedy_solver_list, epsilion_greedy_solver_names)
+
 
     # (3)采样概率随时间衰减
     bandit_10_arm = BernoulliBandit(10)
