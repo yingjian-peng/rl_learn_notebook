@@ -1,5 +1,5 @@
+import gymnasium as gym                                 # 导入 Gymnasium 库
 import copy
-from cliff_walking import CliffWalkingEnv
 
 
 
@@ -90,21 +90,22 @@ def print_agent(agent, action_meaning, disaster=[], end=[]):
 # 主函数
 #---------------------------------------------------------------------------------------
 def main():
-    env = CliffWalkingEnv()
-    action_meaning = ['^', 'v', '<', '>']
-    theta = 0.001
+    env = gym.make("FrozenLake-v1")                         # 创建环境
+    env = env.unwrapped                                      # 解封装后才能访问 nrow、ncol 和 P
+    state, info = env.reset()                               # 将环境初始化到1个新的回合
+    
+    action_meaning = ['<', 'v', '>', '^']
+    theta = 1e-5
     gamma = 0.9
     agent = PolicyIteration(env, theta, gamma)
+    
     agent.policy_iteration()
-    print_agent(agent, action_meaning, list(range(37, 47)), [47])
+    
+    print_agent(agent, action_meaning, [5,7,11,12], [15])
 
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
 
 

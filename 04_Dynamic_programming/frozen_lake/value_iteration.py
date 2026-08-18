@@ -1,23 +1,22 @@
+import gymnasium as gym                                 # 导入 Gymnasium 库
 import copy
-from cliff_walking import CliffWalkingEnv
 
 
 
 #---------------------------------------------------------------------------------------
-# 策略迭代算法
+# 价值迭代算法
 #---------------------------------------------------------------------------------------
-class PolicyIteration:
+class ValueIteration:
     def __init__(self, env, theta, gamma):
         self.env = env
         self.v = [0] * self.env.ncol * self.env.nrow        # 初始化价值为0
-        self.pi = [[0.25, 0.25, 0.25, 0.25]
-        for i in range(self.env.ncol * self.env.nrow)]      # 初始化为均匀随机策略
-        self.theta = theta                                  # 策略评估收敛阈值
-        self.gamma = gamma                                  # 折扣因子
+        self.theta = theta                                  # 价值收敛阈值
+        self.gamma = gamma
+        self.pi = [None for i in range(self.env.ncol * self.env.nrow)]  # 价值迭代结束后得到的策略
 
-    def policy_evaluation(self):                            # 策略评估
-        cnt = 1                                             # 计数器
-        while True:
+    def value_iteration(self):
+        cnt = 0
+        while 1:
             max_diff = 0
             new_v = [0] * self.env.ncol * self.env.nrow
             for s in range(self.env.ncol * self.env.nrow):
@@ -27,15 +26,16 @@ class PolicyIteration:
                     for res in self.env.P[s][a]:
                         p, next_state, r, done = res
                         qsa += p * (r + self.gamma * self.v[next_state] * (1 - done))
-                    qsa_list.append(self.pi[s][a] * qsa)    # 本章环境比较特殊,奖励和下一个状态有关,所以需要和状态转移概率相乘
-                new_v[s] = sum(qsa_list)                    # 状态价值函数和动作价值函数之间的关系
+                    qsa_list.append(qsa)                    # 这一行和下一行代码是价值迭代和策略迭代的主要区别
+                new_v[s] = max(qsa_list)
                 max_diff = max(max_diff, abs(new_v[s] - self.v[s]))
             self.v = new_v
             if max_diff < self.theta: break                 # 满足收敛条件,退出评估迭代
             cnt += 1
-        print("策略评估进行%d轮后完成" % cnt)
+        print("价值迭代一共进行%d轮" % cnt)
+        self.get_policy()
 
-    def policy_improvement(self):                           # 策略提升
+    def get_policy(self):                                   # 根据价值函数导出一个贪婪策略
         for s in range(self.env.nrow * self.env.ncol):
             qsa_list = []
             for a in range(4):
@@ -47,15 +47,6 @@ class PolicyIteration:
             maxq = max(qsa_list)
             cntq = qsa_list.count(maxq)                     # 计算有几个动作得到了最大的Q值
             self.pi[s] = [1 / cntq if q == maxq else 0 for q in qsa_list]   # 让这些动作均分概率
-        print("策略提升完成")
-        return self.pi
-
-    def policy_iteration(self):                             # 策略迭代
-        while 1:
-            self.policy_evaluation()
-            old_pi = copy.deepcopy(self.pi)                 # 将列表进行深拷贝,方便接下来进行比较
-            new_pi = self.policy_improvement()
-            if old_pi == new_pi: break
 
 
 
@@ -90,19 +81,23 @@ def print_agent(agent, action_meaning, disaster=[], end=[]):
 # 主函数
 #---------------------------------------------------------------------------------------
 def main():
-    env = CliffWalkingEnv()
-    action_meaning = ['^', 'v', '<', '>']
-    theta = 0.001
+    env = gym.make("FrozenLake-v1")                         # 创建环境
+    env = env.unwrapped                                      # 解封装后才能访问 nrow、ncol 和 P
+    state, info = env.reset()                               # 将环境初始化到1个新的回合
+    
+    action_meaning = ['<', 'v', '>', '^']
+    theta = 1e-5
     gamma = 0.9
-    agent = PolicyIteration(env, theta, gamma)
-    agent.policy_iteration()
-    print_agent(agent, action_meaning, list(range(37, 47)), [47])
+    agent = ValueIteration(env, theta, gamma)
+    
+    agent.value_iteration()
+    
+    print_agent(agent, action_meaning, [5,7,11,12], [15])
 
 
 
 if __name__ == "__main__":
     main()
-
 
 
 
